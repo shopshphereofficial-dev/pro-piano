@@ -13,7 +13,6 @@ import android.view.MotionEvent;
 import android.view.View;
 import androidx.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +37,7 @@ public class PianoKeyboardView extends View {
         public final boolean isBlack;
         public final String name;
         public final String solfege;
-        public RectF rect = new RectF();
+        public float left, top, right, bottom;
 
         public KeyInfo(int midiNote, boolean isBlack, String name, String solfege) {
             this.midiNote = midiNote;
@@ -51,6 +50,7 @@ public class PianoKeyboardView extends View {
     public static final int MIN_NOTE = 21;  // A0
     public static final int MAX_NOTE = 108; // C8
 
+    private final List<KeyInfo> allKeys = new ArrayList<>();
     private final List<KeyInfo> whiteKeys = new ArrayList<>();
     private final List<KeyInfo> blackKeys = new ArrayList<>();
     private final Map<Integer, KeyInfo> keyMap = new HashMap<>();
@@ -64,25 +64,28 @@ public class PianoKeyboardView extends View {
     private Paint blackKeyPaint;
     private Paint blackKeyPressedPaint;
     private Paint highlightPaint;
-    private Paint strokePaint;
+    private Paint highlightBlackPaint;
+    private Paint borderPaint;
     private Paint labelPaint;
-    private Paint miniMapPaint;
+    private Paint blackLabelPaint;
+    private Paint miniMapBgPaint;
+    private Paint miniMapWhitePaint;
+    private Paint miniMapBlackPaint;
     private Paint miniMapViewportPaint;
+    private Paint middleCDotPaint;
 
     private float scrollX = 0f;
     private float maxScrollX = 0f;
-    private float keyWidth = 90f;
+    private float keyWidth = 105f;
     private float blackKeyWidth;
     private float blackKeyHeight;
+    private float miniMapHeight = 40f;
 
     private LabelMode labelMode = LabelMode.NOTE_NAME;
     private OnKeyListener keyListener;
     private Vibrator vibrator;
     private boolean hapticsEnabled = true;
-
-    // Mini map bar height at top
-    private final float MINI_MAP_HEIGHT = 44f;
-    private boolean draggingMiniMap = false;
+    private boolean isDraggingMiniMap = false;
 
     public PianoKeyboardView(Context context) {
         super(context);
@@ -104,52 +107,69 @@ public class PianoKeyboardView extends View {
         buildKeyList();
 
         whiteKeyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        whiteKeyPaint.setColor(Color.WHITE);
-
         whiteKeyPressedPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        whiteKeyPressedPaint.setColor(Color.parseColor("#E0DDD5"));
+        whiteKeyPressedPaint.setColor(Color.parseColor("#DDD4C4"));
 
         blackKeyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        blackKeyPaint.setColor(Color.parseColor("#18181A"));
-
         blackKeyPressedPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        blackKeyPressedPaint.setColor(Color.parseColor("#383A4A"));
+        blackKeyPressedPaint.setColor(Color.parseColor("#3C3E52"));
 
         highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        highlightPaint.setColor(Color.parseColor("#4CAF50"));
+        highlightPaint.setColor(Color.parseColor("#2ECC71")); // Emerald Green
 
-        strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        strokePaint.setColor(Color.parseColor("#2B2B33"));
-        strokePaint.setStyle(Paint.Style.STROKE);
-        strokePaint.setStrokeWidth(2f);
+        highlightBlackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        highlightBlackPaint.setColor(Color.parseColor("#27AE60"));
+
+        borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        borderPaint.setColor(Color.parseColor("#1B1C22"));
+        borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setStrokeWidth(2f);
 
         labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        labelPaint.setColor(Color.parseColor("#5A5B6E"));
         labelPaint.setTextAlign(Paint.Align.CENTER);
-        labelPaint.setColor(Color.parseColor("#777788"));
         labelPaint.setTextSize(26f);
+        labelPaint.setFakeBoldText(true);
 
-        miniMapPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        blackLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        blackLabelPaint.setColor(Color.parseColor("#E0E0EE"));
+        blackLabelPaint.setTextAlign(Paint.Align.CENTER);
+        blackLabelPaint.setTextSize(20f);
+
+        middleCDotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        middleCDotPaint.setColor(Color.parseColor("#D4AF37")); // Gold dot for C4
+
+        miniMapBgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        miniMapBgPaint.setColor(Color.parseColor("#14151C"));
+
+        miniMapWhitePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        miniMapWhitePaint.setColor(Color.parseColor("#A8ABB8"));
+
+        miniMapBlackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        miniMapBlackPaint.setColor(Color.parseColor("#0C0C0E"));
+
         miniMapViewportPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        miniMapViewportPaint.setStyle(Paint.Style.STROKE);
-        miniMapViewportPaint.setStrokeWidth(4f);
-        miniMapViewportPaint.setColor(Color.parseColor("#D4AF37"));
+        miniMapViewportPaint.setColor(Color.parseColor("#55D4AF37"));
+        miniMapViewportPaint.setStyle(Paint.Style.FILL);
     }
 
     private void buildKeyList() {
         String[] noteNames = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-        String[] solfege = {"Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"};
-        boolean[] isBlack = {false, true, false, true, false, false, true, false, true, false, true, false};
+        String[] solfegeNames = {"Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"};
+        boolean[] isBlackArray = {false, true, false, true, false, false, true, false, true, false, true, false};
 
         for (int midi = MIN_NOTE; midi <= MAX_NOTE; midi++) {
             int noteIndex = midi % 12;
             int octave = (midi / 12) - 1;
-            boolean black = isBlack[noteIndex];
+            boolean isBlack = isBlackArray[noteIndex];
             String name = noteNames[noteIndex] + octave;
-            String solf = solfege[noteIndex];
+            String solfege = solfegeNames[noteIndex];
 
-            KeyInfo key = new KeyInfo(midi, black, name, solf);
+            KeyInfo key = new KeyInfo(midi, isBlack, name, solfege);
+            allKeys.add(key);
             keyMap.put(midi, key);
-            if (black) {
+
+            if (isBlack) {
                 blackKeys.add(key);
             } else {
                 whiteKeys.add(key);
@@ -163,54 +183,65 @@ public class PianoKeyboardView extends View {
         layoutKeys();
     }
 
+    public void setKeyWidth(float width) {
+        this.keyWidth = Math.max(70f, Math.min(180f, width));
+        layoutKeys();
+        invalidate();
+    }
+
+    public float getKeyWidth() {
+        return keyWidth;
+    }
+
     private void layoutKeys() {
         int w = getWidth();
         int h = getHeight();
-        if (w <= 0 || h <= 0) return;
+        if (w == 0 || h == 0) return;
 
-        // Show roughly 10 white keys on screen
-        keyWidth = Math.max(75f, (float) w / 10.5f);
-        blackKeyWidth = keyWidth * 0.58f;
-        float keyboardHeight = h - MINI_MAP_HEIGHT;
-        blackKeyHeight = keyboardHeight * 0.62f;
+        miniMapHeight = 38f;
+        blackKeyWidth = keyWidth * 0.62f;
+        blackKeyHeight = (h - miniMapHeight) * 0.60f;
 
-        float left = 0;
-        for (KeyInfo wk : whiteKeys) {
-            wk.rect.set(left, MINI_MAP_HEIGHT, left + keyWidth, h);
-            left += keyWidth;
+        // Position white keys side by side
+        for (int i = 0; i < whiteKeys.size(); i++) {
+            KeyInfo key = whiteKeys.get(i);
+            key.left = i * keyWidth;
+            key.top = miniMapHeight;
+            key.right = key.left + keyWidth;
+            key.bottom = h;
         }
 
-        float totalWhiteWidth = whiteKeys.size() * keyWidth;
-        maxScrollX = Math.max(0, totalWhiteWidth - w);
-
-        // Position black keys based on adjacent white keys
-        for (KeyInfo bk : blackKeys) {
-            int noteInOctave = bk.midiNote % 12;
-            // Find white key right before it
-            KeyInfo prevWhite = keyMap.get(bk.midiNote - 1);
-            if (prevWhite != null) {
-                float center = prevWhite.rect.right;
-                if (noteInOctave == 1) center = prevWhite.rect.right - 2; // C#
-                else if (noteInOctave == 3) center = prevWhite.rect.right + 2; // D#
-                else if (noteInOctave == 6) center = prevWhite.rect.right - 3; // F#
-                else if (noteInOctave == 10) center = prevWhite.rect.right + 3; // A#
-
-                bk.rect.set(center - blackKeyWidth / 2, MINI_MAP_HEIGHT, center + blackKeyWidth / 2, MINI_MAP_HEIGHT + blackKeyHeight);
+        // Position black keys over the boundary between corresponding white keys
+        int currentWhiteIndex = 0;
+        for (int i = 0; i < allKeys.size(); i++) {
+            KeyInfo key = allKeys.get(i);
+            if (!key.isBlack) {
+                currentWhiteIndex = whiteKeys.indexOf(key);
+            } else {
+                // Black key sits between (currentWhiteIndex) and (currentWhiteIndex + 1)
+                float boundaryX = (currentWhiteIndex + 1) * keyWidth;
+                key.left = boundaryX - (blackKeyWidth / 2.0f);
+                key.top = miniMapHeight;
+                key.right = key.left + blackKeyWidth;
+                key.bottom = miniMapHeight + blackKeyHeight;
             }
         }
 
-        // Default scroll position to Middle C (C4 = 60)
-        KeyInfo c4 = keyMap.get(60);
-        if (c4 != null && scrollX == 0) {
-            scrollX = Math.max(0, Math.min(c4.rect.left - w / 2f + keyWidth / 2, maxScrollX));
-        }
+        float totalKeyboardWidth = whiteKeys.size() * keyWidth;
+        maxScrollX = Math.max(0, totalKeyboardWidth - w);
+
+        // Clamp current scroll
+        if (scrollX > maxScrollX) scrollX = maxScrollX;
+        if (scrollX < 0) scrollX = 0;
     }
 
     public void scrollToOctave(int octave) {
-        int targetMidi = (octave + 1) * 12; // C of that octave
+        // Find C note for this octave
+        int targetMidi = (octave + 1) * 12;
         KeyInfo key = keyMap.get(targetMidi);
         if (key != null) {
-            scrollX = Math.max(0, Math.min(key.rect.left - getWidth() / 2f + keyWidth / 2f, maxScrollX));
+            float targetScroll = key.left - (getWidth() / 2f) + (keyWidth / 2f);
+            scrollX = Math.max(0f, Math.min(maxScrollX, targetScroll));
             invalidate();
         }
     }
@@ -232,218 +263,150 @@ public class PianoKeyboardView extends View {
         this.hapticsEnabled = enabled;
     }
 
-    public void setHighlightedNotes(Set<Integer> notes) {
+    public void setHighlightedNote(int midiNote) {
         highlightedNotes.clear();
-        if (notes != null) highlightedNotes.addAll(notes);
-        invalidate();
-    }
-
-    public void highlightSingleNote(int midiNote) {
-        highlightedNotes.clear();
-        if (midiNote > 0) {
+        if (midiNote >= MIN_NOTE && midiNote <= MAX_NOTE) {
             highlightedNotes.add(midiNote);
-            // Auto scroll to bring tutorial note into view if out of sight
-            KeyInfo k = keyMap.get(midiNote);
-            if (k != null) {
-                if (k.rect.left < scrollX + 100 || k.rect.right > scrollX + getWidth() - 100) {
-                    scrollX = Math.max(0, Math.min(k.rect.centerX() - getWidth() / 2f, maxScrollX));
+            // Auto scroll to target note if outside viewport
+            KeyInfo key = keyMap.get(midiNote);
+            if (key != null) {
+                if (key.left < scrollX || key.right > scrollX + getWidth()) {
+                    scrollX = Math.max(0f, Math.min(maxScrollX, key.left - (getWidth() / 2f)));
                 }
             }
         }
         invalidate();
     }
 
-    public void triggerVisualPress(int midiNote, boolean pressed) {
-        if (pressed) {
-            pressedNotes.add(midiNote);
-        } else {
-            pressedNotes.remove(midiNote);
-        }
+    public void clearHighlights() {
+        highlightedNotes.clear();
         invalidate();
     }
 
-    @Override
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
-
-        int w = getWidth();
-        int h = getHeight();
-
-        // 1. Draw Mini-Map / Octave strip at top
-        drawMiniMap(canvas, w);
-
-        // 2. Draw 88 keys with scrolling
-        canvas.save();
-        canvas.translate(-scrollX, 0);
-
-        // Draw White Keys
-        for (KeyInfo wk : whiteKeys) {
-            // Cull offscreen keys
-            if (wk.rect.right < scrollX - 50 || wk.rect.left > scrollX + w + 50) continue;
-
-            boolean isPressed = pressedNotes.contains(wk.midiNote);
-            boolean isHighlighted = highlightedNotes.contains(wk.midiNote);
-
-            if (isHighlighted) {
-                canvas.drawRect(wk.rect, highlightPaint);
-            } else if (isPressed) {
-                canvas.drawRect(wk.rect, whiteKeyPressedPaint);
-            } else {
-                canvas.drawRect(wk.rect, whiteKeyPaint);
-            }
-
-            // Outline & 3D shadow at bottom of white key
-            canvas.drawRect(wk.rect, strokePaint);
-
-            // Note Labels
-            if (labelMode != LabelMode.NONE) {
-                String label = (labelMode == LabelMode.NOTE_NAME) ? wk.name : wk.solfege;
-                canvas.drawText(label, wk.rect.centerX(), wk.rect.bottom - 24f, labelPaint);
-            }
-        }
-
-        // Draw Black Keys on top
-        for (KeyInfo bk : blackKeys) {
-            if (bk.rect.right < scrollX - 50 || bk.rect.left > scrollX + w + 50) continue;
-
-            boolean isPressed = pressedNotes.contains(bk.midiNote);
-            boolean isHighlighted = highlightedNotes.contains(bk.midiNote);
-
-            if (isHighlighted) {
-                canvas.drawRoundRect(bk.rect, 8f, 8f, highlightPaint);
-            } else if (isPressed) {
-                canvas.drawRoundRect(bk.rect, 8f, 8f, blackKeyPressedPaint);
-            } else {
-                canvas.drawRoundRect(bk.rect, 8f, 8f, blackKeyPaint);
-            }
-
-            canvas.drawRoundRect(bk.rect, 8f, 8f, strokePaint);
-        }
-
-        canvas.restore();
+    public void pressKeyExternal(int midiNote) {
+        pressedNotes.add(midiNote);
+        invalidate();
     }
 
-    private void drawMiniMap(Canvas canvas, int w) {
-        // Background strip for mini map
-        miniMapPaint.setColor(Color.parseColor("#15161C"));
-        canvas.drawRect(0, 0, w, MINI_MAP_HEIGHT, miniMapPaint);
-
-        float totalPianoWidth = whiteKeys.size() * keyWidth;
-        float scale = (float) w / totalPianoWidth;
-
-        // Draw miniature white/black bars
-        for (KeyInfo wk : whiteKeys) {
-            float mx = wk.rect.left * scale;
-            float mw = wk.rect.width() * scale;
-            miniMapPaint.setColor(Color.parseColor("#7A7E91"));
-            canvas.drawRect(mx, 4, mx + mw, MINI_MAP_HEIGHT - 4, miniMapPaint);
-        }
-        for (KeyInfo bk : blackKeys) {
-            float mx = bk.rect.left * scale;
-            float mw = bk.rect.width() * scale;
-            miniMapPaint.setColor(Color.parseColor("#0A0B0E"));
-            canvas.drawRect(mx, 4, mx + mw, MINI_MAP_HEIGHT * 0.65f, miniMapPaint);
-        }
-
-        // Draw viewport rect showing current visible area
-        float viewLeft = scrollX * scale;
-        float viewRight = (scrollX + w) * scale;
-        canvas.drawRoundRect(new RectF(viewLeft, 2, viewRight, MINI_MAP_HEIGHT - 2), 6, 6, miniMapViewportPaint);
+    public void releaseKeyExternal(int midiNote) {
+        pressedNotes.remove(midiNote);
+        invalidate();
     }
 
-    private float lastScrollTouchX = 0f;
+    private void vibrate() {
+        if (hapticsEnabled && vibrator != null && vibrator.hasVibrator()) {
+            vibrator.vibrate(12);
+        }
+    }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
-        int pointerIndex = event.getActionIndex();
-        int pointerId = event.getPointerId(pointerIndex);
+        int actionIndex = event.getActionIndex();
 
-        // Handle MiniMap scrub / navigation
-        float touchY = event.getY(pointerIndex);
-        if (touchY <= MINI_MAP_HEIGHT || draggingMiniMap) {
+        // 1. Handle Mini-Map interaction
+        float firstTouchY = event.getY(actionIndex);
+        if (firstTouchY <= miniMapHeight || isDraggingMiniMap) {
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
-                draggingMiniMap = true;
-                float touchX = event.getX(pointerIndex);
-                float totalPianoWidth = whiteKeys.size() * keyWidth;
-                float scale = (float) getWidth() / totalPianoWidth;
-                scrollX = Math.max(0, Math.min((touchX / scale) - getWidth() / 2f, maxScrollX));
+                isDraggingMiniMap = true;
+                float touchX = event.getX(actionIndex);
+                float fraction = Math.max(0f, Math.min(1f, touchX / (float) getWidth()));
+                scrollX = fraction * maxScrollX;
                 invalidate();
                 return true;
             } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                draggingMiniMap = false;
+                isDraggingMiniMap = false;
                 return true;
             }
         }
 
+        // 2. Handle Piano Keys Multi-touch
         switch (action) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN: {
-                float x = event.getX(pointerIndex) + scrollX;
-                float y = event.getY(pointerIndex);
-                int note = findKeyAt(x, y);
-                if (note != -1) {
-                    pointerToNote.put(pointerId, note);
-                    pressedNotes.add(note);
-                    if (keyListener != null) keyListener.onKeyDown(note);
-                    doHaptic();
+                int pointerId = event.getPointerId(actionIndex);
+                float touchX = event.getX(actionIndex);
+                float touchY = event.getY(actionIndex);
+
+                int hitNote = getNoteAt(touchX, touchY);
+                if (hitNote != -1) {
+                    pointerToNote.put(pointerId, hitNote);
+                    if (!pressedNotes.contains(hitNote)) {
+                        pressedNotes.add(hitNote);
+                        vibrate();
+                        if (keyListener != null) keyListener.onKeyDown(hitNote);
+                    }
                     invalidate();
                 }
                 break;
             }
 
             case MotionEvent.ACTION_MOVE: {
-                for (int i = 0; i < event.getPointerCount(); i++) {
-                    int pId = event.getPointerId(i);
-                    float x = event.getX(i) + scrollX;
-                    float y = event.getY(i);
-                    int currentNote = findKeyAt(x, y);
-                    Integer oldNote = pointerToNote.get(pId);
+                int pointerCount = event.getPointerCount();
+                boolean changed = false;
 
-                    if (oldNote != null && oldNote != currentNote) {
-                        pressedNotes.remove(oldNote);
-                        if (keyListener != null) keyListener.onKeyUp(oldNote);
-                        if (currentNote != -1) {
-                            pointerToNote.put(pId, currentNote);
-                            pressedNotes.add(currentNote);
-                            if (keyListener != null) keyListener.onKeyDown(currentNote);
-                            doHaptic();
-                        } else {
-                            pointerToNote.remove(pId);
+                for (int p = 0; p < pointerCount; p++) {
+                    int pointerId = event.getPointerId(p);
+                    float touchX = event.getX(p);
+                    float touchY = event.getY(p);
+
+                    int newNote = getNoteAt(touchX, touchY);
+                    Integer oldNote = pointerToNote.get(pointerId);
+
+                    if (oldNote != null && oldNote != newNote) {
+                        // Lift old note if no other finger is pressing it
+                        if (!isNoteHeldByOtherPointer(oldNote, pointerId)) {
+                            pressedNotes.remove(oldNote);
+                            if (keyListener != null) keyListener.onKeyUp(oldNote);
                         }
-                        invalidate();
-                    } else if (oldNote == null && currentNote != -1) {
-                        pointerToNote.put(pId, currentNote);
-                        pressedNotes.add(currentNote);
-                        if (keyListener != null) keyListener.onKeyDown(currentNote);
-                        doHaptic();
-                        invalidate();
+
+                        if (newNote != -1) {
+                            pointerToNote.put(pointerId, newNote);
+                            if (!pressedNotes.contains(newNote)) {
+                                pressedNotes.add(newNote);
+                                vibrate();
+                                if (keyListener != null) keyListener.onKeyDown(newNote);
+                            }
+                        } else {
+                            pointerToNote.remove(pointerId);
+                        }
+                        changed = true;
+                    } else if (oldNote == null && newNote != -1) {
+                        pointerToNote.put(pointerId, newNote);
+                        if (!pressedNotes.contains(newNote)) {
+                            pressedNotes.add(newNote);
+                            vibrate();
+                            if (keyListener != null) keyListener.onKeyDown(newNote);
+                        }
+                        changed = true;
                     }
                 }
+
+                if (changed) invalidate();
                 break;
             }
 
-            case MotionEvent.ACTION_POINTER_UP:
-            case MotionEvent.ACTION_UP: {
-                Integer note = pointerToNote.remove(pointerId);
-                if (note != null) {
-                    pressedNotes.remove(note);
-                    if (keyListener != null) keyListener.onKeyUp(note);
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_POINTER_UP: {
+                int pointerId = event.getPointerId(actionIndex);
+                Integer releasedNote = pointerToNote.remove(pointerId);
+
+                if (releasedNote != null) {
+                    if (!isNoteHeldByOtherPointer(releasedNote, pointerId)) {
+                        pressedNotes.remove(releasedNote);
+                        if (keyListener != null) keyListener.onKeyUp(releasedNote);
+                    }
                     invalidate();
-                }
-                if (action == MotionEvent.ACTION_UP) {
-                    draggingMiniMap = false;
                 }
                 break;
             }
 
             case MotionEvent.ACTION_CANCEL: {
-                for (Integer note : pointerToNote.values()) {
+                for (int note : pressedNotes) {
                     if (keyListener != null) keyListener.onKeyUp(note);
                 }
                 pointerToNote.clear();
                 pressedNotes.clear();
-                draggingMiniMap = false;
                 invalidate();
                 break;
             }
@@ -451,26 +414,174 @@ public class PianoKeyboardView extends View {
         return true;
     }
 
-    private int findKeyAt(float x, float y) {
-        // Priority to black keys because they sit on top of white keys
-        for (KeyInfo bk : blackKeys) {
-            if (bk.rect.contains(x, y)) {
-                return bk.midiNote;
+    private boolean isNoteHeldByOtherPointer(int note, int currentPointerId) {
+        for (Map.Entry<Integer, Integer> entry : pointerToNote.entrySet()) {
+            if (entry.getKey() != currentPointerId && entry.getValue() == note) {
+                return true;
             }
         }
-        for (KeyInfo wk : whiteKeys) {
-            if (wk.rect.contains(x, y)) {
-                return wk.midiNote;
+        return false;
+    }
+
+    private int getNoteAt(float screenX, float screenY) {
+        if (screenY < miniMapHeight) return -1;
+
+        float worldX = screenX + scrollX;
+        float worldY = screenY;
+
+        // 1. Black keys have priority since they are in front
+        if (worldY <= miniMapHeight + blackKeyHeight) {
+            for (KeyInfo bk : blackKeys) {
+                if (worldX >= bk.left && worldX <= bk.right && worldY >= bk.top && worldY <= bk.bottom) {
+                    return bk.midiNote;
+                }
             }
         }
+
+        // 2. White keys
+        int whiteIndex = (int) (worldX / keyWidth);
+        if (whiteIndex >= 0 && whiteIndex < whiteKeys.size()) {
+            return whiteKeys.get(whiteIndex).midiNote;
+        }
+
         return -1;
     }
 
-    private void doHaptic() {
-        if (hapticsEnabled && vibrator != null && vibrator.hasVibrator()) {
-            try {
-                vibrator.vibrate(12);
-            } catch (Exception ignored) {}
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+
+        int viewW = getWidth();
+        int viewH = getHeight();
+        if (viewW == 0 || viewH == 0) return;
+
+        // Draw Mini-Map first at top
+        drawMiniMap(canvas, viewW);
+
+        // Save canvas for scrolled piano keys
+        canvas.save();
+        canvas.translate(-scrollX, 0);
+
+        // Draw White Keys
+        for (KeyInfo key : whiteKeys) {
+            // Cull offscreen keys
+            if (key.right < scrollX || key.left > scrollX + viewW) continue;
+
+            boolean isPressed = pressedNotes.contains(key.midiNote);
+            boolean isHighlighted = highlightedNotes.contains(key.midiNote);
+
+            RectF rect = new RectF(key.left, key.top, key.right, key.bottom);
+
+            if (isHighlighted) {
+                canvas.drawRoundRect(rect, 4f, 4f, highlightPaint);
+            } else if (isPressed) {
+                canvas.drawRoundRect(rect, 4f, 4f, whiteKeyPressedPaint);
+            } else {
+                // Realistic ivory key gradient
+                LinearGradient grad = new LinearGradient(
+                        key.left, key.top, key.left, key.bottom,
+                        Color.parseColor("#FFFFFF"), Color.parseColor("#F4F1EA"),
+                        Shader.TileMode.CLAMP
+                );
+                whiteKeyPaint.setShader(grad);
+                canvas.drawRoundRect(rect, 4f, 4f, whiteKeyPaint);
+            }
+
+            // Divider border
+            canvas.drawRect(rect, borderPaint);
+
+            // Middle C (C4) indicator dot
+            if (key.midiNote == 60) {
+                canvas.drawCircle(key.left + (keyWidth / 2f), key.bottom - 48f, 6f, middleCDotPaint);
+            }
+
+            // Key labels
+            if (labelMode != LabelMode.NONE) {
+                String text = (labelMode == LabelMode.NOTE_NAME) ? key.name : key.solfege;
+                canvas.drawText(text, key.left + (keyWidth / 2f), key.bottom - 18f, labelPaint);
+            }
         }
+
+        // Draw Black Keys (on top of white keys)
+        for (KeyInfo key : blackKeys) {
+            // Cull offscreen keys
+            if (key.right < scrollX || key.left > scrollX + viewW) continue;
+
+            boolean isPressed = pressedNotes.contains(key.midiNote);
+            boolean isHighlighted = highlightedNotes.contains(key.midiNote);
+
+            RectF rect = new RectF(key.left, key.top, key.right, key.bottom);
+
+            if (isHighlighted) {
+                canvas.drawRoundRect(rect, 6f, 6f, highlightBlackPaint);
+            } else if (isPressed) {
+                canvas.drawRoundRect(rect, 6f, 6f, blackKeyPressedPaint);
+            } else {
+                LinearGradient grad = new LinearGradient(
+                        key.left, key.top, key.left, key.bottom,
+                        Color.parseColor("#2B2D38"), Color.parseColor("#101014"),
+                        Shader.TileMode.CLAMP
+                );
+                blackKeyPaint.setShader(grad);
+                canvas.drawRoundRect(rect, 6f, 6f, blackKeyPaint);
+            }
+
+            // Subtle 3D bottom bevel lip
+            canvas.drawRect(key.left, key.bottom - 6f, key.right, key.bottom, borderPaint);
+
+            // Black key labels
+            if (labelMode != LabelMode.NONE) {
+                String text = (labelMode == LabelMode.NOTE_NAME) ? key.name : key.solfege;
+                canvas.drawText(text, key.left + (blackKeyWidth / 2f), key.bottom - 14f, blackLabelPaint);
+            }
+        }
+
+        canvas.restore();
+    }
+
+    private void drawMiniMap(Canvas canvas, int viewW) {
+        // Mini Map Background
+        canvas.drawRect(0, 0, viewW, miniMapHeight, miniMapBgPaint);
+
+        float miniWhiteW = viewW / (float) whiteKeys.size();
+        float miniBlackW = miniWhiteW * 0.70f;
+        float miniBlackH = miniMapHeight * 0.60f;
+
+        // Draw miniature white keys
+        for (int i = 0; i < whiteKeys.size(); i++) {
+            float x1 = i * miniWhiteW;
+            float x2 = x1 + miniWhiteW;
+            canvas.drawRect(x1 + 0.5f, 2f, x2 - 0.5f, miniMapHeight - 2f, miniMapWhitePaint);
+        }
+
+        // Draw miniature black keys
+        int currentWhite = 0;
+        for (int i = 0; i < allKeys.size(); i++) {
+            KeyInfo key = allKeys.get(i);
+            if (!key.isBlack) {
+                currentWhite = whiteKeys.indexOf(key);
+            } else {
+                float bx = (currentWhite + 1) * miniWhiteW - (miniBlackW / 2.0f);
+                canvas.drawRect(bx, 2f, bx + miniBlackW, miniBlackH, miniMapBlackPaint);
+            }
+        }
+
+        // Draw Viewport Rect (shows current visible octave area)
+        float totalKeyboardWidth = whiteKeys.size() * keyWidth;
+        float viewportWidthRatio = Math.min(1.0f, (float) viewW / totalKeyboardWidth);
+        float vpW = Math.max(28f, viewW * viewportWidthRatio);
+
+        float scrollFraction = (maxScrollX > 0) ? (scrollX / maxScrollX) : 0f;
+        float vpX = scrollFraction * (viewW - vpW);
+
+        RectF vpRect = new RectF(vpX, 1f, vpX + vpW, miniMapHeight - 1f);
+        canvas.drawRoundRect(vpRect, 4f, 4f, miniMapViewportPaint);
+
+        // Viewport golden border
+        Paint vpBorder = new Paint(Paint.ANTI_ALIAS_FLAG);
+        vpBorder.setColor(Color.parseColor("#D4AF37"));
+        vpBorder.setStyle(Paint.Style.STROKE);
+        vpBorder.setStrokeWidth(2f);
+        canvas.drawRoundRect(vpRect, 4f, 4f, vpBorder);
     }
 }
