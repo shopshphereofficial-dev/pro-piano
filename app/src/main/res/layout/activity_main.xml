@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark">
+
+    <!-- Top Fallboard Control Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/wood_fallboard"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp">
+
+        <!-- App Logo & Title -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PRO PIANO"
+            android:textColor="@color/gold_accent"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:letterSpacing="0.1"
+            android:paddingEnd="12dp" />
+
+        <!-- Octave Quick Switchers -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnOctaveDown"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="40dp"
+                android:layout_height="36dp"
+                android:text="◀"
+                android:textColor="@color/text_white"
+                android:minWidth="0dp"
+                android:padding="0dp" />
+
+            <TextView
+                android:id="@+id/tvCurrentOctave"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="C4"
+                android:textColor="@color/gold_accent"
+                android:textStyle="bold"
+                android:paddingHorizontal="4dp" />
+
+            <Button
+                android:id="@+id/btnOctaveUp"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="40dp"
+                android:layout_height="36dp"
+                android:text="▶"
+                android:textColor="@color/text_white"
+                android:minWidth="0dp"
+                android:padding="0dp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="24dp"
+            android:background="#333344"
+            android:layout_marginHorizontal="6dp" />
+
+        <!-- Instrument Selector -->
+        <Button
+            android:id="@+id/btnInstrument"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="🎹 Grand Piano"
+            android:textColor="@color/text_white"
+            android:textSize="12sp"
+            android:textAllCaps="false"
+            android:paddingHorizontal="10dp" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="24dp"
+            android:background="#333344"
+            android:layout_marginHorizontal="6dp" />
+
+        <!-- Sustain Pedal Toggle -->
+        <Button
+            android:id="@+id/btnSustain"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="PEDAL OFF"
+            android:textColor="@color/text_dim"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:paddingHorizontal="10dp" />
+
+        <!-- Metronome Button -->
+        <Button
+            android:id="@+id/btnMetronome"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:text="⏱ 100 BPM"
+            android:textColor="@color/text_white"
+            android:textSize="11sp"
+            android:textAllCaps="false"
+            android:paddingHorizontal="8dp" />
+
+        <!-- Space filler -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Recording Controls -->
+        <Button
+            android:id="@+id/btnRecord"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="🔴 REC"
+            android:textColor="#FF5252"
+            android:textSize="11sp"
+            android:paddingHorizontal="8dp" />
+
+        <Button
+            android:id="@+id/btnPlayRecord"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
+            android:text="▶ PLAY"
+            android:textColor="@color/text_white"
+            android:textSize="11sp"
+            android:paddingHorizontal="8dp" />
+
+        <!-- Tutorial Songs Button -->
+        <Button
+            android:id="@+id/btnSongs"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:text="🎵 Songs"
+            android:textColor="@color/gold_accent"
+            android:textSize="11sp"
+            android:textAllCaps="false"
+            android:paddingHorizontal="8dp" />
+
+        <!-- Labels Toggle Button -->
+        <Button
+            android:id="@+id/btnLabels"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="C4"
+            android:textColor="@color/text_dim"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:paddingHorizontal="6dp" />
+
+    </LinearLayout>
+
+    <!-- Main Piano View with Mini-Map -->
+    <com.propiano.app.PianoKeyboardView
+        android:id="@+id/pianoKeyboardView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>
