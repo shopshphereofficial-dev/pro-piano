@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_dark">#121318</color>
+    <color name="wood_fallboard">#1F1511</color>
+    <color name="gold_accent">#D4AF37</color>
+    <color name="gold_glow">#FFDF73</color>
+    <color name="card_bg">#1E2029</color>
+    <color name="white_key_pressed">#DDD8D0</color>
+    <color name="black_key_pressed">#33333E</color>
+    <color name="highlight_key">#4CAF50</color>
+    <color name="highlight_key_black">#2E7D32</color>
+    <color name="text_white">#F0F0F0</color>
+    <color name="text_dim">#8E92A4</color>
+</resources>
